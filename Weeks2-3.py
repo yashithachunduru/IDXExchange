@@ -2,7 +2,7 @@ import pandas as pd
 import glob
 import sys
 
-# --- PHASE 1: LOAD & FILTER ---
+# PHASE 1: LOAD & FILTER
 print("1. Loading Sold Data...")
 sold_files = glob.glob("CRMLSSold*.csv")
 if not sold_files:
@@ -12,7 +12,7 @@ df_sold = pd.concat([pd.read_csv(f, low_memory=False) for f in sold_files])
 print(f"   Property Types Found: {df_sold['PropertyType'].unique()}")
 df_sold = df_sold[df_sold['PropertyType'] == 'Residential'].copy()
 
-# --- PHASE 2: MORTGAGE DATA ---
+# PHASE 2: MORTGAGE DATA
 print("\n2. Fetching Mortgage Data...")
 url = "https://fred.stlouisfed.org/graph/fredgraph.csv?id=MORTGAGE30US"
 try:
@@ -25,10 +25,10 @@ try:
 except Exception as e:
     print(f"   Mortgage Download Failed: {e}"); sys.exit()
 
-# --- PHASE 3: DATE CONVERSION & MERGE ---
+# PHASE 3: DATE CONVERSION & MERGE
 print("\n3. Processing Dates and Merging...")
 
-# Speed Trick: cache=True makes 381k rows process in seconds
+
 df_sold['CloseDate'] = pd.to_datetime(df_sold['CloseDate'], errors='coerce', cache=True)
 
 # Remove rows without a date
@@ -54,7 +54,7 @@ if listing_files:
     final_listed.to_csv('final_enriched_listed_data.csv', index=False)
     print("   Listings Enriched and saved.")
 
-# --- PHASE 4: SUMMARY FOR SUBMISSION ---
+# PHASE 4: SUMMARY FOR SUBMISSION
 print("\n--- DISTRIBUTION SUMMARY ---")
 cols_to_check = ['ClosePrice', 'LivingArea', 'DaysOnMarket']
 existing_cols = [c for c in cols_to_check if c in df_sold.columns]
@@ -62,4 +62,19 @@ print(df_sold[existing_cols].describe())
 
 # Check for nulls after merge
 null_check = final_sold['rate_30yr_fixed'].isnull().sum()
-print(f"\n✅ ALL DONE. Null Mortgage Rates: {null_check}")
+print(f"\n ALL DONE. Null Mortgage Rates: {null_check}")
+
+# --- MISSING VALUE REPORT ---
+print("\n--- MISSING VALUE ANALYSIS ---")
+# 1. Calculate percentage of missing values per column
+null_report = (final_sold.isnull().mean() * 100).sort_values(ascending=False)
+
+# 2. Filter for only columns with more than 90% missing data
+high_null_cols = null_report[null_report > 90]
+
+print(f"Found {len(high_null_cols)} columns with > 90% missing data:")
+print(high_null_cols)
+
+# 3. Save the list so you can open it in Excel tomorrow
+high_null_cols.to_csv('columns_to_drop_report.csv')
+print("\n Report saved as 'columns_to_drop_report.csv'")
